@@ -1,0 +1,41 @@
+# Deploys the QuorumCluster resource in quorum/ into the "quorum" namespace.
+# The operator (apps/quorum-operator.yaml) sees it and creates the
+# StatefulSet, Services and PodDisruptionBudget. This app only manages the
+# QuorumCluster itself; the objects the operator creates belong to the
+# operator.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # Not "quorum": that was the old Helm-based app. A new name lets Argo CD
+  # remove the old app cleanly.
+  name: quorum-cluster
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/momoElbn/quorum-gitops
+    targetRevision: main
+    path: quorum
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: quorum
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # The QuorumCluster kind only exists once the operator app has
+      # installed the CRD. Without this, the first sync could fail its dry
+      # run before the CRD is there.
+      - SkipDryRunOnMissingResource=true
+    # And if it still fails because the CRD isn't ready yet, try again
+    # instead of waiting for the next periodic sync (every 3 minutes).
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

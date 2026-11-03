@@ -1,0 +1,32 @@
+# Installs the quorum operator: the QuorumCluster CRD, the operator
+# Deployment and its RBAC, from charts/quorum-operator in the quorum repo.
+#
+# The image (quorum-operator:dev) isn't in a registry yet. Build it and load
+# it into k3d first, from the quorum repo's operator/ directory:
+#   docker build -t quorum-operator:dev . && k3d image import quorum-operator:dev -c quorum
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quorum-operator
+  namespace: argocd
+  # Deleting this Application deletes what it deployed, including the CRD,
+  # which deletes every QuorumCluster with it (their PVCs stay).
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/momoElbn/quorum
+    # Tracks main while the operator is under development, instead of a
+    # pinned version.
+    targetRevision: main
+    path: charts/quorum-operator
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: quorum-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

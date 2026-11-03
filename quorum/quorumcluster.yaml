@@ -1,0 +1,16 @@
+# The quorum-server cluster, described as a QuorumCluster. The operator turns
+# it into a StatefulSet (pods quorum-0..2), Services and a PodDisruptionBudget.
+#
+# The name "quorum" matters: the old Helm release used the same names, so
+# the new StatefulSet picks up the existing volumes (data-quorum-0..2) and
+# the Raft data in them.
+apiVersion: quorum.momoelbn.github.io/v1alpha1
+kind: QuorumCluster
+metadata:
+  name: quorum
+spec:
+  replicas: 3 # can't be changed after creation yet
+  # Build and load it into k3d from the quorum repo:
+  #   docker build -t quorum-server:dev . && k3d image import quorum-server:dev -c quorum
+  image: quorum-server:dev
+  storageSize: 1Gi # can't be changed after creation
