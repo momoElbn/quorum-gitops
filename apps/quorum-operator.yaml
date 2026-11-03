@@ -20,13 +20,13 @@ spec:
     # The quorum repo's CI pipeline sets targetRevision and the image tag
     # below to the commit it just built, after every merge to main. Chart,
     # CRD and operator image then always come from that same commit.
-    targetRevision: f4f56b4ebcc0476e2f2552b07eab52ec63491110
+    targetRevision: 1e59c36d9d96da551ec8d5af2206f9b833fe14b4
     path: charts/quorum-operator
     helm:
       valuesObject:
         image:
           repository: ghcr.io/momoelbn/quorum-operator
-          tag: f4f56b4ebcc0476e2f2552b07eab52ec63491110
+          tag: 1e59c36d9d96da551ec8d5af2206f9b833fe14b4
   destination:
     server: https://kubernetes.default.svc
     namespace: quorum-operator
