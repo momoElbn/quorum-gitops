@@ -1,0 +1,29 @@
+# Tells Prometheus (from kube-prometheus-stack) to scrape GET /metrics on
+# every quorum pod, every 15 seconds.
+#
+# A ServiceMonitor points at a Service. Prometheus looks up that Service's
+# endpoints (one per pod) and scrapes each pod directly. It adds the labels
+# namespace, pod and service to every series, which the dashboard uses.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: quorum
+  labels:
+    # kube-prometheus-stack's Prometheus only picks up ServiceMonitors with
+    # this label (its serviceMonitorSelector is release=<helm release name>).
+    # Without it, this object is silently ignored.
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quorum
+      app.kubernetes.io/instance: quorum
+      # The headless Service, not the client one. Both select the same pods,
+      # so matching both would scrape everything twice. The headless Service
+      # also lists pods that aren't ready, so a struggling pod is still
+      # scraped. The operator sets this label.
+      app.kubernetes.io/component: peers
+  endpoints:
+    - port: http # the Service port named "http" (8080)
+      path: /metrics
+      interval: 15s
