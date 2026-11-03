@@ -83,7 +83,9 @@ data:
               },
               "expr": "max by (pod) (quorum_raft_state{namespace=\"$namespace\", state=\"leader\"}) == 1",
               "legendFormat": "{{pod}}",
-              "refId": "A"
+              "refId": "A",
+              "instant": true,
+              "range": false
             }
           ],
           "fieldConfig": {
@@ -115,7 +117,7 @@ data:
           "id": 2,
           "type": "stat",
           "title": "Leader changes",
-          "description": "New leaders seen in the selected time range. Every pod counts the leader changes it observes; the busiest pod's count is shown, because a pod that restarted starts counting from zero.",
+          "description": "Leader changes in the selected time range, counted from each pod's Raft state (scraped every 15 s). Counting from the state rather than from a per-pod counter keeps the number right when pods restart, which resets their counters.",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -132,7 +134,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "round(max(increase(quorum_leader_changes_total{namespace=\"$namespace\"}[$__range])))",
+              "expr": "sum(changes(quorum_raft_state{namespace=\"$namespace\", state=\"leader\"}[$__range]))",
               "legendFormat": "",
               "refId": "A"
             }
@@ -293,16 +295,8 @@ data:
           "fieldConfig": {
             "defaults": {
               "color": {
-                "mode": "thresholds"
-              },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "transparent",
-                    "value": null
-                  }
-                ]
+                "mode": "fixed",
+                "fixedColor": "text"
               },
               "mappings": [
                 {
@@ -456,7 +450,7 @@ data:
           "id": 8,
           "type": "timeseries",
           "title": "Leader changes",
-          "description": "New leaders seen per interval.",
+          "description": "Leader changes per interval, from each pod's Raft state.",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -473,7 +467,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "max(increase(quorum_leader_changes_total{namespace=\"$namespace\"}[$__rate_interval]))",
+              "expr": "sum(changes(quorum_raft_state{namespace=\"$namespace\", state=\"leader\"}[$__rate_interval]))",
               "legendFormat": "leader changes",
               "refId": "A"
             }
