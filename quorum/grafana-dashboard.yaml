@@ -1,0 +1,556 @@
+# Grafana dashboard for quorum, as a ConfigMap.
+#
+# kube-prometheus-stack runs a sidecar next to Grafana that watches every
+# namespace for ConfigMaps labeled grafana_dashboard: "1" and loads the JSON
+# inside them as dashboards. So the dashboard lives in Git and needs no
+# clicking in the Grafana UI. Edits made in the UI are lost when the
+# ConfigMap changes: change the JSON here instead.
+#
+# Panels: current leader, leader changes, writes committed, write errors,
+# Raft state per pod over time, write rate by result, write latency
+# p50/p99, leader changes over time, write errors over time.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quorum-dashboard
+  labels:
+    grafana_dashboard: "1"
+data:
+  quorum.json: |
+    {
+      "uid": "quorum",
+      "title": "Quorum",
+      "description": "Raft-replicated key-value store: leadership, Raft state, writes.",
+      "tags": [
+        "quorum",
+        "raft"
+      ],
+      "editable": true,
+      "refresh": "10s",
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "schemaVersion": 39,
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "label": "Data source",
+            "type": "datasource",
+            "query": "prometheus",
+            "current": {},
+            "hide": 0
+          },
+          {
+            "name": "namespace",
+            "label": "Namespace",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "query": "label_values(quorum_raft_state, namespace)",
+            "definition": "label_values(quorum_raft_state, namespace)",
+            "refresh": 2,
+            "current": {},
+            "hide": 0,
+            "sort": 1
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Leader",
+          "description": "The pod that currently reports itself as Raft leader.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "max by (pod) (quorum_raft_state{namespace=\"$namespace\", state=\"leader\"}) == 1",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "noValue": "no leader",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "name",
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Leader changes",
+          "description": "New leaders seen in the selected time range. Every pod counts the leader changes it observes; the busiest pod's count is shown, because a pod that restarted starts counting from zero.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 0
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "round(max(increase(quorum_leader_changes_total{namespace=\"$namespace\"}[$__range])))",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "noValue": "0",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value",
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Writes committed",
+          "description": "Writes the leader committed and acknowledged in the selected time range.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 0
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "round(sum(increase(quorum_writes_total{namespace=\"$namespace\", result=\"ok\"}[$__range])))",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "noValue": "0",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value",
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Write errors",
+          "description": "Writes that reached the leader but failed (e.g. leadership lost mid-write) in the selected time range. Requests to a dead pod never reach the server, so they aren't counted here: quorum-checker measures those.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 0
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "round(sum(increase(quorum_writes_total{namespace=\"$namespace\", result=\"error\"}[$__range])))",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "noValue": "0",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value",
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 5,
+          "type": "state-timeline",
+          "title": "Raft state per pod",
+          "description": "Each pod's Raft role over time. A gap means the pod wasn't scraped (down or restarting).",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "max by (pod) (quorum_raft_state{namespace=\"$namespace\", state=\"follower\"}) + 2 * max by (pod) (quorum_raft_state{namespace=\"$namespace\", state=\"candidate\"}) + 3 * max by (pod) (quorum_raft_state{namespace=\"$namespace\", state=\"leader\"}) + 4 * max by (pod) (quorum_raft_state{namespace=\"$namespace\", state=\"shutdown\"})",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "transparent",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "1": {
+                      "text": "Follower",
+                      "color": "blue",
+                      "index": 0
+                    },
+                    "2": {
+                      "text": "Candidate",
+                      "color": "orange",
+                      "index": 1
+                    },
+                    "3": {
+                      "text": "Leader",
+                      "color": "green",
+                      "index": 2
+                    },
+                    "4": {
+                      "text": "Shutdown",
+                      "color": "red",
+                      "index": 3
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "showValue": "auto",
+            "mergeValues": true,
+            "rowHeight": 0.8,
+            "legend": {
+              "showLegend": false
+            }
+          }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Write rate by result",
+          "description": "ok: committed by the leader. redirect: a follower sent the client to the leader. error: the leader failed to commit.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 11
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum by (result) (rate(quorum_writes_total{namespace=\"$namespace\"}[$__rate_interval]))",
+              "legendFormat": "{{result}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "lineWidth": 1,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Write latency (leader)",
+          "description": "Time for the leader to commit and apply a write through Raft: one round trip to a majority plus a disk sync.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 11
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "histogram_quantile(0.5, sum by (le) (rate(quorum_write_duration_seconds_bucket{namespace=\"$namespace\"}[$__rate_interval])))",
+              "legendFormat": "p50",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(quorum_write_duration_seconds_bucket{namespace=\"$namespace\"}[$__rate_interval])))",
+              "legendFormat": "p99",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "lineWidth": 1,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Leader changes",
+          "description": "New leaders seen per interval.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 19
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "max(increase(quorum_leader_changes_total{namespace=\"$namespace\"}[$__rate_interval]))",
+              "legendFormat": "leader changes",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "lineWidth": 1,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Write errors",
+          "description": "Writes per second that reached the leader but failed to commit.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 19
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(rate(quorum_writes_total{namespace=\"$namespace\", result=\"error\"}[$__rate_interval]))",
+              "legendFormat": "errors",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "lineWidth": 1,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ]
+    }

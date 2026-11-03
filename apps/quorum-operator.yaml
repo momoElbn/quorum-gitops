@@ -1,9 +1,9 @@
 # Installs the quorum operator: the QuorumCluster CRD, the operator
 # Deployment and its RBAC, from charts/quorum-operator in the quorum repo.
 #
-# The image (quorum-operator:dev) isn't in a registry yet. Build it and load
-# it into k3d first, from the quorum repo's operator/ directory:
-#   docker build -t quorum-operator:dev . && k3d image import quorum-operator:dev -c quorum
+# The image comes from ghcr.io/momoelbn/quorum-operator once the quorum
+# repo's CI has deployed for the first time. Until then it's the local
+# quorum-operator:dev image imported into k3d.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -17,10 +17,16 @@ spec:
   project: default
   source:
     repoURL: https://github.com/momoElbn/quorum
-    # Tracks main while the operator is under development, instead of a
-    # pinned version.
+    # The quorum repo's CI pipeline sets targetRevision and the image tag
+    # below to the commit it just built, after every merge to main. Chart,
+    # CRD and operator image then always come from that same commit.
     targetRevision: main
     path: charts/quorum-operator
+    helm:
+      valuesObject:
+        image:
+          repository: quorum-operator
+          tag: dev
   destination:
     server: https://kubernetes.default.svc
     namespace: quorum-operator
