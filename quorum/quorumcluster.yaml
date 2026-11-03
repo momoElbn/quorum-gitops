@@ -13,5 +13,5 @@ spec:
   # Set by the quorum repo's CI after every merge to main, to
   # ghcr.io/momoelbn/quorum-server:<commit SHA>. Changing it rolls the pods
   # one at a time.
-  image: ghcr.io/momoelbn/quorum-server:1e59c36d9d96da551ec8d5af2206f9b833fe14b4
+  image: ghcr.io/momoelbn/quorum-server:4b57d9f2c8afc47f66454c8fe31b5d9784331aa2
   storageSize: 1Gi # can't be changed after creation
